@@ -27,10 +27,10 @@ fn internal_add(left:&mut Vec<u64>,right:&[u64]){
     let left_len = left.len();
     let right_len = right.len();
     let mut carry = false;
+    for (left_val,right_val) in left.iter_mut().zip(right.iter()){
+        (*left_val,carry) = carry_add(*left_val, *right_val, carry);
+    }
     if left_len > right_len{
-        for (left_val,right_val) in left.iter_mut().zip(right.iter()){
-            (*left_val,carry) = carry_add(*left_val, *right_val, carry);
-        }
         let mut it = left.iter_mut().skip(right_len);
         while carry{
             match it.next(){
@@ -42,9 +42,6 @@ fn internal_add(left:&mut Vec<u64>,right:&[u64]){
             left.push(1);
         }
     }else{
-        for (left_val,right_val) in left.iter_mut().zip(right.iter()){
-            (*left_val,carry) = carry_add(*left_val, *right_val, carry);
-        }
         let mut it = right.iter().skip(left_len);
         while carry{
             match it.next(){
