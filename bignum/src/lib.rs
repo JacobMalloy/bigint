@@ -17,53 +17,66 @@ impl From<u64> for BigInt{
     }
 }
 
-fn internal_add<'a,T>(it:T)->bool
-where T:Iterator<Item=(&'a mut u64,&'a u64)>{
-    let negative = false;
+fn carry_add(a:u64,b:u64,carry:bool)->(u64,bool){
+    let (add1,carry1) = a.overflowing_add(if carry{1}else{0});
+    let (add2,carry2) = add1.overflowing_add(b);
+    return (add2,carry1||carry2);
+}
+
+fn internal_add(left:&mut Vec<u64>,right:&[u64]){
+    let left_len = left.len();
+    let right_len = right.len();
     let mut carry = false;
-    //let mut data = Vec::with_capacity(it.size_hint().0);
-    for (left,right) in it{
-        let (add1,carry1) = left.overflowing_add(if carry{1}else{0});
-        let (add2,carry2) = add1.overflowing_add(*right);
-        *left = add2;
-        carry = carry1||carry2;
+    if left_len > right_len{
+        for (left_val,right_val) in left.iter_mut().zip(right.iter()){
+            (*left_val,carry) = carry_add(*left_val, *right_val, carry);
+        }
+        let mut it = left.iter_mut().skip(right_len);
+        while carry{
+            match it.next(){
+                Some(c) => {(*c,carry) = c.overflowing_add(1)}
+                None => {break;}
+            }
+        }
+        if carry{
+            left.push(1);
+        }
+    }else{
+        for (left_val,right_val) in left.iter_mut().zip(right.iter()){
+            (*left_val,carry) = carry_add(*left_val, *right_val, carry);
+        }
+        let mut it = right.iter().skip(left_len);
+        while carry{
+            match it.next(){
+                Some(c) => {
+                    let (tmp_val,tmp_carry) = c.overflowing_add(1);
+                    left.push(tmp_val);
+                    carry = tmp_carry; 
+                }
+                None => {break;}
+            }
+        }
+        if carry{
+            left.push(1);
+        }else{
+            left.extend(it);
+        }
     }
-    return carry; 
-
-    //return BigInt{negative:negative,data:data};
-
 }
 
 
 impl Add<&BigInt> for &BigInt{
     type Output = BigInt;
-    fn add(self,right:&BigInt) -> BigInt{
+    fn add(self,rhs:&BigInt) -> BigInt{
         let mut return_value = self.clone();
-        let carry = if self.data.len() > right.data.len(){
-            internal_add(return_value.data.iter_mut().zip(right.data.iter().chain(iter::repeat(&0))))
-        } else if self.data.len() < right.data.len() {
-            let diff = right.data.len()-self.data.len(); 
-            return_value.data.extend(iter::repeat(0).take(diff));
-            internal_add(return_value.data.iter_mut().zip(right.data.iter()))
-        }else{
-            internal_add(return_value.data.iter_mut().zip(right.data.iter()))
-        };
-
-        if carry{
-            return_value.data.push(1);
-        }
+        internal_add(&mut return_value.data, &rhs.data); 
         return return_value;
     }
 }
 
 impl AddAssign<&BigInt> for BigInt{
     fn add_assign(&mut self, rhs: &BigInt) {
-        let expand = rhs.data.len().checked_sub(self.data.len()).unwrap_or(0);
-        self.data.extend(iter::repeat(0).take(expand));
-        let carry = internal_add(self.data.iter_mut().zip(rhs.data.iter().chain(iter::repeat(&0))));
-        if carry{
-            self.data.push(1);
-        } 
+        internal_add(&mut self.data, &rhs.data)
     }
 }
 
